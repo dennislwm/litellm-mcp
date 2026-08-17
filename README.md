@@ -1,4 +1,4 @@
-# ibm-litellm-mcp
+# litellm-mcp
 
 MCP server exposing [LiteLLM](https://github.com/BerriAI/litellm)'s multi-provider LLM gateway as tools callable over the Model Context Protocol, built on the official [Python MCP SDK](https://github.com/modelcontextprotocol/python-sdk).
 
