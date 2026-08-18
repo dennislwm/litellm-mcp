@@ -32,7 +32,10 @@ def get_spend_logs(start_date: str, end_date: str) -> list[dict]:
 
 
 def _call_litellm(
-    method: str, path: str, params: dict | None = None, json: dict | None = None
+    method: str,
+    path: str,
+    params: dict | None = None,
+    json: dict | None = None,
 ) -> dict | list:
     response = httpx2.request(
         method,
@@ -48,7 +51,10 @@ def _call_litellm(
 
 @mcp.tool()
 def call_litellm(
-    method: str, path: str, params: dict | None = None, json: dict | None = None
+    method: str,
+    path: str,
+    params: dict | None = None,
+    json: dict | None = None,
 ) -> dict | list:
     """Call any LiteLLM Proxy REST endpoint (per ADR-02).
 
