@@ -13,3 +13,13 @@ Requires: [pipenv](https://pipenv.pypa.io/)
     make test
     make lint
     make check-pins
+
+## Running the server
+
+Requires: a reachable [LiteLLM Proxy](https://docs.litellm.ai/docs/proxy/quick_start) instance.
+
+Set the proxy connection as environment variables, then run the server over stdio:
+
+    export LITELLM_PROXY_API_BASE=http://localhost:4000
+    export LITELLM_PROXY_API_KEY=sk-1234
+    pipenv run mcp dev app/server.py
