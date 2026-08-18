@@ -4,15 +4,12 @@ MCP server exposing [LiteLLM](https://github.com/BerriAI/litellm)'s multi-provid
 
 Requires: [pipenv](https://pipenv.pypa.io/)
 
-## Setup
+## Workflow
 
-    make setup
-
-## Usage
-
-    make test
-    make lint
-    make check-pins
+One-time `make setup` installs the pipenv environment; everything else
+runs against it. Day to day: point the server at a running LiteLLM
+Proxy and run it (below); `make test`/`make lint`/`make check-pins`
+verify a change before it ships.
 
 ## Running the server
 
@@ -23,3 +20,10 @@ Set the proxy connection as environment variables, then run the server over stdi
     export LITELLM_PROXY_API_BASE=http://localhost:4000
     export LITELLM_PROXY_API_KEY=sk-1234
     pipenv run mcp dev app/server.py
+
+## Maintainer setup
+
+    make setup
+    make test
+    make lint
+    make check-pins

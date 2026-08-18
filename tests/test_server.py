@@ -7,7 +7,7 @@ os.environ.setdefault("LITELLM_PROXY_API_KEY", "sk-test")
 from app.server import _get_spend_logs  # noqa: E402
 
 
-@patch("app.server.httpx.get")
+@patch("app.server.httpx2.get")
 def test_get_spend_logs_calls_proxy_with_bearer_auth(
     mock_get: MagicMock,
 ) -> None:
