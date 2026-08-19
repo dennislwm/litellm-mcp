@@ -53,6 +53,7 @@ install_deps() {
 run_test() {
   check_pipenv
   pipenv run pytest tests/
+  bash tests/test_make_key_guard.sh
 }
 
 run_lint() {
@@ -105,7 +106,21 @@ proxy_key_status() {
     -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" | jq .
 }
 
+# ponytail: seeded with the only route this project concretely uses
+# today (get_spend_logs -> /spend/logs). call_litellm is a generic
+# pass-through by design (ADR-02), so this list needs a new entry
+# whenever a real caller starts using another LiteLLM endpoint --
+# update it, don't widen it speculatively ahead of actual usage.
+PROXY_KEY_ALLOWED_ROUTES='["/spend/logs"]'
+
 proxy_key_update() {
+  if [[ "${PROXY_KEY_ALLOWED_ROUTES}" == "[]" ]]; then
+    echo "[ERROR][proxy_key_update]: refusing to update key with an" \
+      "empty allowed_routes -- per ADR-05, an empty/unset list is a" \
+      "LiteLLM no-op that ALLOWS ALL routes, not a deny-all. Populate" \
+      "PROXY_KEY_ALLOWED_ROUTES before running this."
+    return 1
+  fi
   set -a; source "${PROXY_DIR}/.env"; set +a
   curl -s -X POST http://localhost:4000/key/update \
     -H "Content-Type: application/json" \
@@ -116,7 +131,8 @@ proxy_key_update() {
       \"budget_duration\": \"30d\",
       \"tpm_limit\": 100000,
       \"rpm_limit\": 60,
-      \"models\": [\"gpt-4o-mini\"]
+      \"models\": [\"gpt-4o-mini\"],
+      \"allowed_routes\": ${PROXY_KEY_ALLOWED_ROUTES}
     }" | jq .
 }
 

@@ -18,7 +18,7 @@ help:
 	@echo "  proxy-down        Stop the local LiteLLM Proxy"
 	@echo "  proxy-status      Show local proxy container status"
 	@echo "  proxy-logs        Show local proxy logs"
-	@echo "  proxy-key-update  Apply budget/rate-limit/model restrictions to the local proxy's virtual key"
+	@echo "  proxy-key-update  Apply budget/rate-limit/model/allowed-route restrictions to the local proxy's virtual key"
 	@echo "  proxy-key-status  Show current enforcement values for the local proxy's virtual key"
 	@echo "  proxy-clean       Stop and remove local proxy containers (prompts to delete volumes)"
 	@echo ""
