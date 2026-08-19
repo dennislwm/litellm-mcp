@@ -9,7 +9,11 @@ Requires: [pipenv](https://pipenv.pypa.io/)
 One-time `make setup` installs the pipenv environment; everything else
 runs against it. Day to day: point the server at a running LiteLLM
 Proxy and run it (below); `make test`/`make lint`/`make check-pins`
-verify a change before it ships.
+verify a change before it ships. `make test-integration` also verifies
+against a real LiteLLM Proxy -- requires [Podman](https://podman.io/),
+no setup needed otherwise: it stands up and tears down its own
+ephemeral, isolated proxy automatically, separate from the one `make
+proxy-up` manages.
 
 ## Running the server
 
@@ -35,5 +39,6 @@ Set the proxy connection as environment variables, then run the server over stdi
 
     make setup
     make test
+    make test-integration
     make lint
     make check-pins
