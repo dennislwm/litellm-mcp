@@ -52,8 +52,41 @@ install_deps() {
 
 run_test() {
   check_pipenv
-  pipenv run pytest tests/
+  pipenv run pytest tests/ --ignore=tests/integration
   bash tests/test_make_key_guard.sh
+}
+
+TEST_PROXY_PORT="4001"
+
+test_proxy_up() {
+  (cd "${PROXY_DIR}" && LITELLM_PORT="${TEST_PROXY_PORT}" \
+    OPENAI_API_KEY=sk-test-dummy LITELLM_MASTER_KEY=sk-test-ephemeral \
+    ${CONTAINER_CMD} compose -p test -f compose.yaml up -d)
+  local tries=0
+  until curl -s -o /dev/null "http://localhost:${TEST_PROXY_PORT}/health/liveliness"; do
+    tries=$((tries + 1))
+    if [[ "${tries}" -ge 30 ]]; then
+      echo "[ERROR][test_proxy_up]: proxy did not become healthy within 30s"
+      return 1
+    fi
+    sleep 1
+  done
+}
+
+test_proxy_down() {
+  (cd "${PROXY_DIR}" && ${CONTAINER_CMD} compose -p test -f compose.yaml down --volumes)
+}
+
+run_test_integration() {
+  check_pipenv
+  proxy_init
+  test_proxy_up
+  local result=0
+  LITELLM_PROXY_API_BASE="http://localhost:${TEST_PROXY_PORT}" \
+    LITELLM_PROXY_API_KEY=sk-test-ephemeral \
+    pipenv run pytest tests/integration/ || result=$?
+  test_proxy_down
+  return "${result}"
 }
 
 run_lint() {

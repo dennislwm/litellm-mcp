@@ -1,4 +1,4 @@
-.PHONY: help setup status install test lint check-pins \
+.PHONY: help setup status install test test-integration lint check-pins \
 	proxy-init proxy-up proxy-down proxy-status proxy-logs \
 	proxy-key-update proxy-key-status proxy-clean
 SHELL := /bin/bash
@@ -10,7 +10,8 @@ help:
 	@echo "  setup             Install pipenv environment (dev deps included)"
 	@echo "  status            Check local machine setup (pipenv installed, env present)"
 	@echo "  install           Install/sync pipenv environment"
-	@echo "  test              Run pytest against tests/"
+	@echo "  test              Run pytest against tests/ (no live proxy needed)"
+	@echo "  test-integration  Run pytest against tests/integration/ (stands up + tears down an ephemeral proxy)"
 	@echo "  lint              Run flake8 and mypy against app/"
 	@echo "  check-pins        Fail if any Pipfile dependency is unpinned"
 	@echo "  proxy-init        Initialize and start the local proxy's container machine"
@@ -34,6 +35,9 @@ install:
 
 test:
 	@bash make.sh run_test
+
+test-integration:
+	@bash make.sh run_test_integration
 
 lint:
 	@bash make.sh run_lint
