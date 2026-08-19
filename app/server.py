@@ -1,4 +1,6 @@
 import os
+import re
+from html.parser import HTMLParser
 
 import httpx2
 from mcp.server import MCPServer
@@ -78,3 +80,129 @@ def call_litellm(
     return _call_litellm(
         method, path, params=params, json=json, allow_write=allow_write
     )
+
+
+class _ConfigTableParser(HTMLParser):
+    """Collects every <table>'s rows as lists of cell texts."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.tables: list[list[list[str]]] = []
+        self._table: list[list[str]] | None = None
+        self._row: list[str] | None = None
+        self._cell: list[str] | None = None
+
+    def handle_starttag(self, tag: str, attrs: list) -> None:
+        if tag == "table":
+            self._table = []
+        elif tag == "tr" and self._table is not None:
+            self._row = []
+        elif tag in ("td", "th") and self._row is not None:
+            self._cell = []
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "table" and self._table is not None:
+            self.tables.append(self._table)
+            self._table = None
+        elif tag == "tr" and self._row is not None and self._table is not None:
+            self._table.append(self._row)
+            self._row = None
+        elif (
+            tag in ("td", "th")
+            and self._cell is not None
+            and self._row is not None
+        ):
+            self._row.append("".join(self._cell).strip())
+            self._cell = None
+
+    def handle_data(self, data: str) -> None:
+        if self._cell is not None:
+            self._cell.append(data)
+
+
+_CONFIG_DOCS_URL = "https://docs.litellm.ai/docs/proxy/config_settings"
+
+_SOURCE_FALLBACK_TARGETS = {
+    "general_settings": (
+        "https://raw.githubusercontent.com/BerriAI/litellm/main/"
+        "litellm/proxy/_types.py"
+    ),
+    "admin_ui_settings": (
+        "https://raw.githubusercontent.com/BerriAI/litellm/main/litellm/"
+        "proxy/ui_crud_endpoints/proxy_setting_endpoints.py"
+    ),
+}
+
+
+def _search_config_docs(field: str) -> dict | None:
+    response = httpx2.get(_CONFIG_DOCS_URL, timeout=30.0)
+    response.raise_for_status()
+    parser = _ConfigTableParser()
+    parser.feed(response.text)
+    for table in parser.tables:
+        for row in table:
+            if row and row[0] == field:
+                return {"source": "docs", "url": _CONFIG_DOCS_URL, "row": row}
+    return None
+
+
+def _search_config_source(field: str) -> dict | None:
+    for sub_tree, url in _SOURCE_FALLBACK_TARGETS.items():
+        response = httpx2.get(url, timeout=30.0)
+        response.raise_for_status()
+        match = re.search(
+            rf'{re.escape(field)}\s*:.*?Field\([^)]*description\s*=\s*'
+            r'"((?:[^"\\]|\\.)*)"',
+            response.text,
+            re.DOTALL,
+        )
+        if match:
+            return {
+                "source": "code",
+                "sub_tree": sub_tree,
+                "url": url,
+                "field": field,
+                "description": match.group(1),
+            }
+    return None
+
+
+def _search_config_issues(field: str) -> list[dict]:
+    try:
+        response = httpx2.get(
+            "https://api.github.com/search/issues",
+            params={"q": f"{field} repo:BerriAI/litellm"},
+            timeout=10.0,
+        )
+        response.raise_for_status()
+        return [
+            {"title": item["title"], "url": item["html_url"]}
+            for item in response.json().get("items", [])[:5]
+        ]
+    except Exception:
+        return []
+
+
+def _search_config(field: str) -> dict:
+    result = _search_config_docs(field)
+    if result is None:
+        result = _search_config_source(field)
+    if result is None:
+        result = {"source": "not_found", "field": field}
+    result["known_issues"] = _search_config_issues(field)
+    return result
+
+
+@mcp.tool()
+def search_config(field: str) -> dict:
+    """Look up a LiteLLM config.yaml or Admin UI setting (per ADR-03).
+
+    Tries docs.litellm.ai's config reference page first (all four
+    config.yaml sub-trees); on no match, falls back to LiteLLM's own
+    source code, scoped to general_settings and Admin UI settings only
+    (litellm_settings/router_settings have no single canonical source
+    target yet). Always appends a best-effort "known_issues" annex from
+    GitHub, non-blocking. field: the exact config.yaml/Admin UI setting
+    name (e.g. "database_url").
+    """
+    return _search_config(field)
