@@ -15,6 +15,16 @@ verify a change before it ships.
 
 Requires: a reachable [LiteLLM Proxy](https://docs.litellm.ai/docs/proxy/quick_start) instance.
 
+No proxy handy? Start one locally:
+
+Requires: [Podman](https://podman.io/)
+
+1. Copy `local-proxy/.env.example` to `local-proxy/.env` and fill in `OPENAI_API_KEY`/`LITELLM_MASTER_KEY`
+2. `make proxy-init` (one-time: starts the Podman machine)
+3. `make proxy-up`
+
+Also available: `make proxy-down`, `make proxy-status`, `make proxy-logs`, `make proxy-key-status`, `make proxy-key-update`, `make proxy-clean` (see `make help`).
+
 Set the proxy connection as environment variables, then run the server over stdio:
 
     export LITELLM_PROXY_API_BASE=http://localhost:4000

@@ -1,0 +1,16 @@
+model_list:
+  - model_name: gpt-4o-mini
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+
+litellm_settings:
+  cache: true
+  cache_params:
+    type: redis
+    host: os.environ/REDIS_HOST
+    port: os.environ/REDIS_PORT
+  max_internal_user_budget: 300.00
+  internal_user_budget_duration: "30d"
+  max_budget: 1000.00
+  budget_duration: "30d"
