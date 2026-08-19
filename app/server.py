@@ -147,6 +147,9 @@ def _search_config_docs(field: str) -> dict | None:
 
 
 def _search_config_source(field: str) -> dict | None:
+    # ponytail: regex scrape of Field(description=...) kwargs, depends on
+    # the upstream file's current single-line field-declaration shape --
+    # switch to ast.parse if BerriAI/litellm reformats these files.
     for sub_tree, url in _SOURCE_FALLBACK_TARGETS.items():
         response = httpx2.get(url, timeout=30.0)
         response.raise_for_status()
