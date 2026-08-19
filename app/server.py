@@ -4,6 +4,7 @@ from html.parser import HTMLParser
 
 import httpx2
 from mcp.server import MCPServer
+from mcp.types import ToolAnnotations
 
 mcp = MCPServer("litellm-mcp")
 
@@ -61,7 +62,13 @@ def _call_litellm(
     return response.json()
 
 
-@mcp.tool()
+@mcp.tool(
+    annotations=ToolAnnotations(
+        destructive_hint=True,
+        read_only_hint=False,
+        open_world_hint=True,
+    )
+)
 def call_litellm(
     method: str,
     path: str,
@@ -75,7 +82,10 @@ def call_litellm(
     with "/" (e.g. "/guardrails/list"). params: query string params.
     json: request body for POST/PUT/PATCH. allow_write: must be True
     for any non-GET method, per ADR-04 -- confirms the caller
-    deliberately intends a write/destructive call.
+    deliberately intends a write/destructive call. Per ADR-04's Option
+    2, this tool's annotations mark it destructive/non-read-only/open-
+    world -- a hint, not enforcement (see the allow_write gate above
+    for the actual server-side guarantee).
     """
     return _call_litellm(
         method, path, params=params, json=json, allow_write=allow_write

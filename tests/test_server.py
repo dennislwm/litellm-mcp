@@ -13,6 +13,7 @@ from app.server import (  # noqa: E402
     _search_config,
     _search_config_docs,
     _search_config_source,
+    mcp,
 )
 
 
@@ -181,3 +182,13 @@ def test_search_config_issues_annex_fails_open(mock_get: MagicMock) -> None:
     from app.server import _search_config_issues
 
     assert _search_config_issues("database_url") == []
+
+
+@pytest.mark.anyio
+async def test_call_litellm_carries_write_annotations() -> None:
+    tools = await mcp.list_tools()
+    call_litellm_tool = next(t for t in tools if t.name == "call_litellm")
+
+    assert call_litellm_tool.annotations.destructive_hint is True
+    assert call_litellm_tool.annotations.read_only_hint is False
+    assert call_litellm_tool.annotations.open_world_hint is True
