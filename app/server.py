@@ -31,12 +31,22 @@ def get_spend_logs(start_date: str, end_date: str) -> list[dict]:
     return _get_spend_logs(start_date, end_date)
 
 
+class WriteNotAllowedError(Exception):
+    pass
+
+
 def _call_litellm(
     method: str,
     path: str,
     params: dict | None = None,
     json: dict | None = None,
+    allow_write: bool = False,
 ) -> dict | list:
+    if method.upper() != "GET" and not allow_write:
+        raise WriteNotAllowedError(
+            f"{method} {path} is a write/destructive call; pass "
+            "allow_write=True to confirm"
+        )
     response = httpx2.request(
         method,
         f"{_proxy_base()}{path}",
@@ -55,11 +65,16 @@ def call_litellm(
     path: str,
     params: dict | None = None,
     json: dict | None = None,
+    allow_write: bool = False,
 ) -> dict | list:
     """Call any LiteLLM Proxy REST endpoint (per ADR-02).
 
     method: HTTP method (GET, POST, ...). path: endpoint path starting
     with "/" (e.g. "/guardrails/list"). params: query string params.
-    json: request body for POST/PUT/PATCH.
+    json: request body for POST/PUT/PATCH. allow_write: must be True
+    for any non-GET method, per ADR-04 -- confirms the caller
+    deliberately intends a write/destructive call.
     """
-    return _call_litellm(method, path, params=params, json=json)
+    return _call_litellm(
+        method, path, params=params, json=json, allow_write=allow_write
+    )
