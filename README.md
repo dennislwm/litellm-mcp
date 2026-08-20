@@ -48,8 +48,14 @@ Over `streamable-http`, per ADR-06, the server also verifies each
 connecting client's bearer token against LiteLLM's own `/key/info` --
 the client must present a valid LiteLLM key as its MCP bearer token.
 `stdio` has no such check (no enforcement point exists for that
-transport). This is single-tenant scoped: every verified caller still
-shares this process's one `LITELLM_PROXY_API_KEY` for outbound calls.
+transport).
+
+Per ADR-08, each client's own verified key is then forwarded as the
+credential for its own outbound LiteLLM calls -- multiple clients
+connected to the same process each use their own key, with ADR-05's
+`allowed_routes`/budget/rate-limit scoping applying per client. `stdio`
+has no verified caller to forward, so it still uses the server's own
+`LITELLM_PROXY_API_KEY` for every call.
 
 ## Maintainer setup
 

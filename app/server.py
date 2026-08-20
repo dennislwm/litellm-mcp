@@ -4,6 +4,7 @@ from html.parser import HTMLParser
 
 import httpx2
 from mcp.server import MCPServer
+from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.auth.provider import AccessToken, TokenVerifier
 from mcp.server.auth.settings import AuthSettings
 from pydantic import AnyHttpUrl
@@ -16,6 +17,15 @@ def _proxy_base() -> str:
 
 def _proxy_key() -> str:
     return os.environ["LITELLM_PROXY_API_KEY"]
+
+
+def _outbound_key() -> str:
+    """The LiteLLM key to use for a tool's outbound call, per ADR-08
+    Option 1: the connected client's own already-verified token when
+    one exists (streamable-http, ADR-06), else the server's static
+    key (stdio, no auth context)."""
+    token = get_access_token()
+    return token.token if token else _proxy_key()
 
 
 class LiteLLMKeyVerifier(TokenVerifier):
@@ -68,7 +78,7 @@ def _get_spend_logs(start_date: str, end_date: str) -> list[dict]:
     response = httpx2.get(
         f"{_proxy_base()}/spend/logs",
         params={"start_date": start_date, "end_date": end_date},
-        headers={"Authorization": f"Bearer {_proxy_key()}"},
+        headers={"Authorization": f"Bearer {_outbound_key()}"},
         timeout=30.0,
     )
     response.raise_for_status()
@@ -102,7 +112,7 @@ def _call_litellm(
         f"{_proxy_base()}{path}",
         params=params,
         json=json,
-        headers={"Authorization": f"Bearer {_proxy_key()}"},
+        headers={"Authorization": f"Bearer {_outbound_key()}"},
         timeout=30.0,
     )
     response.raise_for_status()

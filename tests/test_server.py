@@ -40,6 +40,34 @@ def test_get_spend_logs_calls_proxy_with_bearer_auth(
     assert result == [{"spend": 1.23}]
 
 
+@patch("app.server.httpx2.get")
+def test_get_spend_logs_forwards_caller_token_when_authenticated(
+    mock_get: MagicMock,
+) -> None:
+    from mcp.server.auth.middleware.auth_context import auth_context_var
+    from mcp.server.auth.middleware.bearer_auth import AuthenticatedUser
+    from mcp.server.auth.provider import AccessToken as SDKAccessToken
+
+    mock_response = MagicMock()
+    mock_response.json.return_value = [{"spend": 1.23}]
+    mock_get.return_value = mock_response
+    caller_token = SDKAccessToken(
+        token="sk-caller", client_id="alice", scopes=[]
+    )
+    reset_token = auth_context_var.set(AuthenticatedUser(caller_token))
+    try:
+        _get_spend_logs("2024-01-01", "2024-01-02")
+    finally:
+        auth_context_var.reset(reset_token)
+
+    mock_get.assert_called_once_with(
+        "http://localhost:4000/spend/logs",
+        params={"start_date": "2024-01-01", "end_date": "2024-01-02"},
+        headers={"Authorization": "Bearer sk-caller"},
+        timeout=30.0,
+    )
+
+
 @patch("app.server.httpx2.request")
 def test_call_litellm_calls_proxy_with_bearer_auth(
     mock_request: MagicMock,
