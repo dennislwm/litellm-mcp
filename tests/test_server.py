@@ -90,6 +90,36 @@ def test_call_litellm_calls_proxy_with_bearer_auth(
     assert result == {"guardrails": []}
 
 
+@patch("app.server.httpx2.request")
+def test_call_litellm_forwards_caller_token_when_authenticated(
+    mock_request: MagicMock,
+) -> None:
+    from mcp.server.auth.middleware.auth_context import auth_context_var
+    from mcp.server.auth.middleware.bearer_auth import AuthenticatedUser
+    from mcp.server.auth.provider import AccessToken as SDKAccessToken
+
+    mock_response = MagicMock()
+    mock_response.json.return_value = {"guardrails": []}
+    mock_request.return_value = mock_response
+    caller_token = SDKAccessToken(
+        token="sk-caller", client_id="alice", scopes=[]
+    )
+    reset_token = auth_context_var.set(AuthenticatedUser(caller_token))
+    try:
+        _call_litellm("GET", "/guardrails/list")
+    finally:
+        auth_context_var.reset(reset_token)
+
+    mock_request.assert_called_once_with(
+        "GET",
+        "http://localhost:4000/guardrails/list",
+        params=None,
+        json=None,
+        headers={"Authorization": "Bearer sk-caller"},
+        timeout=30.0,
+    )
+
+
 def test_call_litellm_rejects_write_without_opt_in() -> None:
     with pytest.raises(WriteNotAllowedError):
         _call_litellm("POST", "/key/generate")
