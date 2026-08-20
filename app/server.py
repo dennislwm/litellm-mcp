@@ -219,3 +219,21 @@ def search_config(field: str) -> dict:
     name (e.g. "database_url").
     """
     return _search_config(field)
+
+
+def _run() -> None:
+    """Entry point (per ADR-07). MCP_TRANSPORT selects stdio (default)
+    or streamable-http; MCP_HOST/MCP_PORT only apply to the latter."""
+    transport = os.environ.get("MCP_TRANSPORT", "stdio")
+    if transport == "streamable-http":
+        mcp.run(
+            transport="streamable-http",
+            host=os.environ.get("MCP_HOST", "127.0.0.1"),
+            port=int(os.environ.get("MCP_PORT", "8000")),
+        )
+    else:
+        mcp.run(transport="stdio")
+
+
+if __name__ == "__main__":
+    _run()

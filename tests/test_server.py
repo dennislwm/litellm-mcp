@@ -10,6 +10,7 @@ from app.server import (  # noqa: E402
     WriteNotAllowedError,
     _call_litellm,
     _get_spend_logs,
+    _run,
     _search_config,
     _search_config_docs,
     _search_config_source,
@@ -192,3 +193,45 @@ async def test_call_litellm_carries_write_annotations() -> None:
     assert call_litellm_tool.annotations.destructive_hint is True
     assert call_litellm_tool.annotations.read_only_hint is False
     assert call_litellm_tool.annotations.open_world_hint is True
+
+
+@patch("app.server.mcp.run")
+@patch.dict(os.environ, {}, clear=False)
+def test_run_defaults_to_stdio(mock_run: MagicMock) -> None:
+    os.environ.pop("MCP_TRANSPORT", None)
+
+    _run()
+
+    mock_run.assert_called_once_with(transport="stdio")
+
+
+@patch("app.server.mcp.run")
+@patch.dict(
+    os.environ,
+    {
+        "MCP_TRANSPORT": "streamable-http",
+        "MCP_HOST": "0.0.0.0",
+        "MCP_PORT": "9000",
+    },
+)
+def test_run_streamable_http_reads_host_and_port(mock_run: MagicMock) -> None:
+    _run()
+
+    mock_run.assert_called_once_with(
+        transport="streamable-http", host="0.0.0.0", port=9000
+    )
+
+
+@patch("app.server.mcp.run")
+@patch.dict(os.environ, {"MCP_TRANSPORT": "streamable-http"}, clear=False)
+def test_run_streamable_http_defaults_host_and_port(
+    mock_run: MagicMock,
+) -> None:
+    os.environ.pop("MCP_HOST", None)
+    os.environ.pop("MCP_PORT", None)
+
+    _run()
+
+    mock_run.assert_called_once_with(
+        transport="streamable-http", host="127.0.0.1", port=8000
+    )

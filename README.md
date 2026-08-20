@@ -35,6 +35,15 @@ Set the proxy connection as environment variables, then run the server over stdi
     export LITELLM_PROXY_API_KEY=sk-1234
     pipenv run mcp dev app/server.py
 
+Need a client that can't spawn a local subprocess? Run over
+`streamable-http` instead (per ADR-07), using the entry point directly
+rather than the `mcp dev` wrapper, which is stdio-only:
+
+    export MCP_TRANSPORT=streamable-http
+    export MCP_HOST=127.0.0.1   # optional, defaults shown
+    export MCP_PORT=8000        # optional, defaults shown
+    pipenv run python3 app/server.py
+
 ## Maintainer setup
 
     make setup
