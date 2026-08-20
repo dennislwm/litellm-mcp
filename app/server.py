@@ -30,10 +30,11 @@ def _outbound_key() -> str:
 
 class LiteLLMKeyVerifier(TokenVerifier):
     """Verifies an MCP client's bearer token against LiteLLM's own
-    /key/info, per ADR-06 Option 1. Single-tenant scope only (see
-    ADR-06's Decision Outcome): confirms the token is a valid LiteLLM
-    key, but every verified caller still shares this process's one
-    LITELLM_PROXY_API_KEY for outbound calls."""
+    /key/info, per ADR-06 Option 1: confirms the token is a valid
+    LiteLLM key. Per ADR-08 Option 1, `_outbound_key()` then forwards
+    this same verified token for the caller's own outbound calls, so
+    each connected client's tool calls run under its own LiteLLM
+    scope rather than a single shared key."""
 
     async def verify_token(self, token: str) -> AccessToken | None:
         response = httpx2.get(
