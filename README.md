@@ -44,6 +44,13 @@ rather than the `mcp dev` wrapper, which is stdio-only:
     export MCP_PORT=8000        # optional, defaults shown
     pipenv run python3 app/server.py
 
+Over `streamable-http`, per ADR-06, the server also verifies each
+connecting client's bearer token against LiteLLM's own `/key/info` --
+the client must present a valid LiteLLM key as its MCP bearer token.
+`stdio` has no such check (no enforcement point exists for that
+transport). This is single-tenant scoped: every verified caller still
+shares this process's one `LITELLM_PROXY_API_KEY` for outbound calls.
+
 ## Maintainer setup
 
     make setup

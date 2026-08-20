@@ -4,9 +4,10 @@ from html.parser import HTMLParser
 
 import httpx2
 from mcp.server import MCPServer
+from mcp.server.auth.provider import AccessToken, TokenVerifier
+from mcp.server.auth.settings import AuthSettings
+from pydantic import AnyHttpUrl
 from mcp.types import ToolAnnotations
-
-mcp = MCPServer("litellm-mcp")
 
 
 def _proxy_base() -> str:
@@ -15,6 +16,52 @@ def _proxy_base() -> str:
 
 def _proxy_key() -> str:
     return os.environ["LITELLM_PROXY_API_KEY"]
+
+
+class LiteLLMKeyVerifier(TokenVerifier):
+    """Verifies an MCP client's bearer token against LiteLLM's own
+    /key/info, per ADR-06 Option 1. Single-tenant scope only (see
+    ADR-06's Decision Outcome): confirms the token is a valid LiteLLM
+    key, but every verified caller still shares this process's one
+    LITELLM_PROXY_API_KEY for outbound calls."""
+
+    async def verify_token(self, token: str) -> AccessToken | None:
+        response = httpx2.get(
+            f"{_proxy_base()}/key/info",
+            params={"key": token},
+            headers={"Authorization": f"Bearer {_proxy_key()}"},
+            timeout=10.0,
+        )
+        if response.status_code != 200:
+            return None
+        info = response.json().get("info", response.json())
+        return AccessToken(
+            token=token,
+            client_id=info.get("key_name") or token[:12],
+            scopes=info.get("models") or [],
+        )
+
+
+def _build_mcp() -> MCPServer:
+    if os.environ.get("MCP_TRANSPORT") != "streamable-http":
+        # ponytail: auth is only ever enforced for streamable-http
+        # transport (confirmed via SDK source, ADR-06 Decision
+        # Drivers) -- wiring it for stdio would require issuer/
+        # resource URLs with no enforcement point to apply to.
+        return MCPServer("litellm-mcp")
+    host = os.environ.get("MCP_HOST", "127.0.0.1")
+    port = os.environ.get("MCP_PORT", "8000")
+    return MCPServer(
+        "litellm-mcp",
+        token_verifier=LiteLLMKeyVerifier(),
+        auth=AuthSettings(
+            issuer_url=AnyHttpUrl(_proxy_base()),
+            resource_server_url=AnyHttpUrl(f"http://{host}:{port}"),
+        ),
+    )
+
+
+mcp = _build_mcp()
 
 
 def _get_spend_logs(start_date: str, end_date: str) -> list[dict]:

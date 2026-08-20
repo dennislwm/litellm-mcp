@@ -7,7 +7,9 @@ os.environ.setdefault("LITELLM_PROXY_API_BASE", "http://localhost:4000")
 os.environ.setdefault("LITELLM_PROXY_API_KEY", "sk-test")
 
 from app.server import (  # noqa: E402
+    LiteLLMKeyVerifier,
     WriteNotAllowedError,
+    _build_mcp,
     _call_litellm,
     _get_spend_logs,
     _run,
@@ -235,3 +237,55 @@ def test_run_streamable_http_defaults_host_and_port(
     mock_run.assert_called_once_with(
         transport="streamable-http", host="127.0.0.1", port=8000
     )
+
+
+@pytest.mark.anyio
+@patch("app.server.httpx2.get")
+async def test_key_verifier_accepts_valid_key(mock_get: MagicMock) -> None:
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "key_name": "alice",
+        "models": ["gpt-4"],
+    }
+    mock_get.return_value = mock_response
+
+    token = await LiteLLMKeyVerifier().verify_token("sk-alice")
+
+    mock_get.assert_called_once_with(
+        "http://localhost:4000/key/info",
+        params={"key": "sk-alice"},
+        headers={"Authorization": "Bearer sk-test"},
+        timeout=10.0,
+    )
+    assert token.token == "sk-alice"
+    assert token.client_id == "alice"
+    assert token.scopes == ["gpt-4"]
+
+
+@pytest.mark.anyio
+@patch("app.server.httpx2.get")
+async def test_key_verifier_rejects_invalid_key(mock_get: MagicMock) -> None:
+    mock_response = MagicMock()
+    mock_response.status_code = 401
+    mock_get.return_value = mock_response
+
+    assert await LiteLLMKeyVerifier().verify_token("sk-bad") is None
+
+
+@patch.dict(os.environ, {}, clear=False)
+def test_build_mcp_skips_auth_for_stdio() -> None:
+    os.environ.pop("MCP_TRANSPORT", None)
+
+    server = _build_mcp()
+
+    assert server._token_verifier is None
+
+
+@patch.dict(os.environ, {"MCP_TRANSPORT": "streamable-http"}, clear=False)
+def test_build_mcp_wires_token_verifier_for_streamable_http() -> None:
+    server = _build_mcp()
+
+    assert isinstance(server._token_verifier, LiteLLMKeyVerifier)
+    issuer = str(server.settings.auth.issuer_url).rstrip("/")
+    assert issuer == "http://localhost:4000"
