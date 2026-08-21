@@ -139,22 +139,32 @@ proxy_key_status() {
     -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" | jq .
 }
 
-# ponytail: seeded with the only route this project concretely uses
-# today (get_spend_logs -> /spend/logs). call_litellm is a generic
-# pass-through by design (ADR-02), so this list needs a new entry
-# whenever a real caller starts using another LiteLLM endpoint --
-# update it, don't widen it speculatively ahead of actual usage.
-PROXY_KEY_ALLOWED_ROUTES='["/spend/logs"]'
+proxy_key_generate() {
+  set -a; source "${PROXY_DIR}/.env"; set +a
+  curl -s -X POST http://localhost:4000/key/generate \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+    -d '{"models": ["gpt-4o-mini"]}' | jq .
+  echo ""
+  echo "Copy the \"key\" value above into local-proxy/.env as LITELLM_VIRTUAL_KEY=<key>"
+  echo "Then run: make proxy-key-update -- to apply allowed_routes/budget/rate-limit scoping"
+}
 
 proxy_key_update() {
-  if [[ "${PROXY_KEY_ALLOWED_ROUTES}" == "[]" ]]; then
+  set -a; source "${PROXY_DIR}/.env"; set +a
+  # ponytail: PROXY_KEY_ALLOWED_ROUTES lives in local-proxy/.env
+  # (seeded in .env.example with the only route this project
+  # concretely uses today, get_spend_logs -> /spend/logs). call_litellm
+  # is a generic pass-through by design (ADR-02), so this needs a new
+  # entry whenever a real caller starts using another LiteLLM endpoint
+  # -- update it, don't widen it speculatively ahead of actual usage.
+  if [[ -z "${PROXY_KEY_ALLOWED_ROUTES:-}" || "${PROXY_KEY_ALLOWED_ROUTES}" == "[]" ]]; then
     echo "[ERROR][proxy_key_update]: refusing to update key with an" \
-      "empty allowed_routes -- per ADR-05, an empty/unset list is a" \
-      "LiteLLM no-op that ALLOWS ALL routes, not a deny-all. Populate" \
-      "PROXY_KEY_ALLOWED_ROUTES before running this."
+      "empty/unset allowed_routes -- per ADR-05, an empty/unset list is" \
+      "a LiteLLM no-op that ALLOWS ALL routes, not a deny-all. Set" \
+      "PROXY_KEY_ALLOWED_ROUTES in local-proxy/.env before running this."
     return 1
   fi
-  set -a; source "${PROXY_DIR}/.env"; set +a
   curl -s -X POST http://localhost:4000/key/update \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
@@ -167,6 +177,11 @@ proxy_key_update() {
       \"models\": [\"gpt-4o-mini\"],
       \"allowed_routes\": ${PROXY_KEY_ALLOWED_ROUTES}
     }" | jq .
+}
+
+serve_http() {
+  check_pipenv
+  MCP_TRANSPORT=streamable-http pipenv run python3 app/server.py
 }
 
 proxy_clean() {

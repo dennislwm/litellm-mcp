@@ -1,6 +1,6 @@
 .PHONY: help setup status install test test-integration lint check-pins \
-	proxy-init proxy-up proxy-down proxy-status proxy-logs \
-	proxy-key-update proxy-key-status proxy-clean
+	serve-http proxy-init proxy-up proxy-down proxy-status proxy-logs \
+	proxy-key-generate proxy-key-update proxy-key-status proxy-clean
 SHELL := /bin/bash
 
 help:
@@ -14,11 +14,13 @@ help:
 	@echo "  test-integration  Run pytest against tests/integration/ (stands up + tears down an ephemeral proxy)"
 	@echo "  lint              Run flake8 and mypy against app/"
 	@echo "  check-pins        Fail if any Pipfile dependency is unpinned"
+	@echo "  serve-http        Run the MCP server over streamable-http (per ADR-07)"
 	@echo "  proxy-init        Initialize and start the local proxy's container machine"
 	@echo "  proxy-up          Start a local LiteLLM Proxy via container compose"
 	@echo "  proxy-down        Stop the local LiteLLM Proxy"
 	@echo "  proxy-status      Show local proxy container status"
 	@echo "  proxy-logs        Show local proxy logs"
+	@echo "  proxy-key-generate Generate a new virtual key against the local proxy"
 	@echo "  proxy-key-update  Apply budget/rate-limit/model/allowed-route restrictions to the local proxy's virtual key"
 	@echo "  proxy-key-status  Show current enforcement values for the local proxy's virtual key"
 	@echo "  proxy-clean       Stop and remove local proxy containers (prompts to delete volumes)"
@@ -45,6 +47,9 @@ lint:
 check-pins:
 	@bash make.sh check_pins
 
+serve-http:
+	@bash make.sh serve_http
+
 proxy-init:
 	@bash make.sh proxy_init
 
@@ -59,6 +64,9 @@ proxy-status:
 
 proxy-logs:
 	@bash make.sh proxy_logs
+
+proxy-key-generate:
+	@bash make.sh proxy_key_generate
 
 proxy-key-update:
 	@bash make.sh proxy_key_update

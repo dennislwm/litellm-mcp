@@ -8,8 +8,9 @@ Requires: [pipenv](https://pipenv.pypa.io/)
 
 One-time `make setup` installs the pipenv environment; everything else
 runs against it. Day to day: point the server at a running LiteLLM
-Proxy and run it (below); `make test`/`make lint`/`make check-pins`
-verify a change before it ships. `make test-integration` also verifies
+Proxy and run it (below, `pipenv run mcp dev app/server.py` or `make
+serve-http`); `make test`/`make lint`/`make check-pins` verify a
+change before it ships. `make test-integration` also verifies
 against a real LiteLLM Proxy -- requires [Podman](https://podman.io/),
 no setup needed otherwise: it stands up and tears down its own
 ephemeral, isolated proxy automatically, separate from the one `make
@@ -36,23 +37,46 @@ Set the proxy connection as environment variables, then run the server over stdi
     pipenv run mcp dev app/server.py
 
 Need a client that can't spawn a local subprocess? Run over
-`streamable-http` instead (per ADR-07), using the entry point directly
-rather than the `mcp dev` wrapper, which is stdio-only:
+`streamable-http` instead (per ADR-07):
 
-    export MCP_TRANSPORT=streamable-http
-    export MCP_HOST=127.0.0.1   # optional, defaults shown
-    export MCP_PORT=8000        # optional, defaults shown
-    pipenv run python3 app/server.py
+1. Generate a virtual key for the connecting client:
 
-Over `streamable-http`, per ADR-06, the server also verifies each
-connecting client's bearer token against LiteLLM's own `/key/info` --
-the client must present a valid LiteLLM key as its MCP bearer token.
-`stdio` has no such check (no enforcement point exists for that
-transport).
+       make proxy-key-generate
+
+   Copy the returned key into `local-proxy/.env` as
+   `LITELLM_VIRTUAL_KEY`, then scope it (per ADR-05/ADR-08 -- each
+   client's own key becomes its own outbound credential, so it needs
+   its own `allowed_routes`/budget/rate-limit restrictions, set via
+   `PROXY_KEY_ALLOWED_ROUTES` in `local-proxy/.env`):
+
+       make proxy-key-update
+
+2. Run the server, using the server's own credential (its
+   `LITELLM_PROXY_API_KEY`, distinct from the client key from step 1):
+
+       export LITELLM_PROXY_API_BASE=http://localhost:4000
+       export LITELLM_PROXY_API_KEY=<the server's own key>
+       make serve-http
+
+   `MCP_HOST`/`MCP_PORT` are optional, defaulting to `127.0.0.1:8000`.
+
+3. Register it with Claude Code:
+
+       claude mcp add --transport http litellm-mcp http://127.0.0.1:8000 \
+         --header "Authorization: Bearer <the virtual key from step 1>"
+
+4. Run a first query in Claude Code, e.g. "check the LiteLLM spend logs
+   for today" -- this exercises `get_spend_logs`, verifying the key
+   from step 1 against `/key/info` (ADR-06) before forwarding it as the
+   outbound credential (ADR-08).
+
+Over `streamable-http`, per ADR-06, the server verifies each
+connecting client's bearer token against LiteLLM's own `/key/info`
+before any tool executes. `stdio` has no such check -- no enforcement
+point exists for that transport.
 
 Per ADR-08, each client's own verified key is then forwarded as the
-credential for its own outbound LiteLLM calls -- multiple clients
-connected to the same process each use their own key, with ADR-05's
+credential for its own outbound LiteLLM calls, with ADR-05's
 `allowed_routes`/budget/rate-limit scoping applying per client. `stdio`
 has no verified caller to forward, so it still uses the server's own
 `LITELLM_PROXY_API_KEY` for every call.

@@ -7,7 +7,15 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 source make.sh
 
-PROXY_KEY_ALLOWED_ROUTES='[]'
+TMP_ENV_DIR=$(mktemp -d)
+trap 'rm -rf "${TMP_ENV_DIR}"' EXIT
+cat > "${TMP_ENV_DIR}/.env" <<'EOF'
+LITELLM_MASTER_KEY=sk-test
+LITELLM_VIRTUAL_KEY=sk-test-virtual
+PROXY_KEY_ALLOWED_ROUTES=[]
+EOF
+PROXY_DIR="${TMP_ENV_DIR}"
+
 if proxy_key_update > /dev/null 2>&1; then
   echo "[FAIL] proxy_key_update did not refuse an empty allowed_routes"
   exit 1
